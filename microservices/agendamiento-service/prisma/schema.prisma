@@ -1,0 +1,62 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Turno {
+  id              Int       @id @default(autoincrement())
+  pacienteId      Int
+  medicoId        Int
+  fecha           DateTime
+  hora            String    // Formato HH:MM
+  diaSemana       Int       // 0=Domingo, 1=Lunes, ..., 6=Sábado
+  estado          EstadoTurno @default(PENDIENTE)
+  motivo          String?
+  observaciones   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relación con historial de cambios
+  historialCambios HistorialCambio[]
+
+  @@map("turnos")
+}
+
+model HistorialCambio {
+  id          Int       @id @default(autoincrement())
+  turnoId     Int
+  tipoCambio  TipoCambio
+  descripcion String
+  fechaCambio DateTime  @default(now())
+  usuarioId   Int?      // ID del usuario que realizó el cambio
+  datosAnteriores Json? // Datos del turno antes del cambio
+  datosNuevos Json?     // Datos del turno después del cambio
+
+  // Relación con turno
+  turno Turno @relation(fields: [turnoId], references: [id], onDelete: Cascade)
+
+  @@map("historial_cambios")
+}
+
+enum EstadoTurno {
+  PENDIENTE
+  CONFIRMADO
+  CANCELADO
+  COMPLETADO
+  NO_SHOW
+}
+
+enum TipoCambio {
+  CREACION
+  MODIFICACION
+  CANCELACION
+  REAGENDAMIENTO
+  CONFIRMACION
+}

@@ -1,0 +1,221 @@
+version: '3.8'
+
+services:
+  # API Gateway - Kong
+  api-gateway:
+    image: kong:3.4
+    container_name: api-gateway
+    environment:
+      KONG_DATABASE: "off"
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+    ports:
+      - "8000:8000"  # Proxy
+      - "8001:8001"  # Admin API
+    networks:
+      - app-network
+    volumes:
+      - ./infrastructure/api-gateway/kong.yml:/usr/local/kong/declarative/kong.yml
+    depends_on:
+      - pacientes-service
+      - medicos-service
+      - agendamiento-service
+      - notificaciones-service
+
+  # Message Broker - RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI
+    networks:
+      - app-network
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  # Base de datos para Pacientes
+  pacientes-db:
+    image: postgres:15
+    container_name: pacientes-db
+    environment:
+      POSTGRES_DB: pacientes_db
+      POSTGRES_USER: pacientes_user
+      POSTGRES_PASSWORD: pacientes_pass
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+    volumes:
+      - pacientes_data:/var/lib/postgresql/data
+
+  # Base de datos para Médicos
+  medicos-db:
+    image: postgres:15
+    container_name: medicos-db
+    environment:
+      POSTGRES_DB: medicos_db
+      POSTGRES_USER: medicos_user
+      POSTGRES_PASSWORD: medicos_pass
+    ports:
+      - "5433:5432"
+    networks:
+      - app-network
+    volumes:
+      - medicos_data:/var/lib/postgresql/data
+
+  # Base de datos para Agendamiento
+  agendamiento-db:
+    image: postgres:15
+    container_name: agendamiento-db
+    environment:
+      POSTGRES_DB: agendamiento_db
+      POSTGRES_USER: agendamiento_user
+      POSTGRES_PASSWORD: agendamiento_pass
+    ports:
+      - "5434:5432"
+    networks:
+      - app-network
+    volumes:
+      - agendamiento_data:/var/lib/postgresql/data
+
+  # Base de datos para Notificaciones
+  notificaciones-db:
+    image: postgres:15
+    container_name: notificaciones-db
+    environment:
+      POSTGRES_DB: notificaciones_db
+      POSTGRES_USER: notificaciones_user
+      POSTGRES_PASSWORD: notificaciones_pass
+    ports:
+      - "5435:5432"
+    networks:
+      - app-network
+    volumes:
+      - notificaciones_data:/var/lib/postgresql/data
+
+  # Microservicio de Pacientes
+  pacientes-service:
+    build:
+      context: ./microservices/pacientes-service
+      dockerfile: Dockerfile
+    container_name: pacientes-service
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DATABASE_URL: postgresql://pacientes_user:pacientes_pass@pacientes-db:5432/pacientes_db
+      RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+    ports:
+      - "3001:3001"
+    networks:
+      - app-network
+    depends_on:
+      - pacientes-db
+      - rabbitmq
+
+  # Microservicio de Médicos
+  medicos-service:
+    build:
+      context: ./microservices/medicos-service
+      dockerfile: Dockerfile
+    container_name: medicos-service
+    environment:
+      NODE_ENV: development
+      PORT: 3002
+      DATABASE_URL: postgresql://medicos_user:medicos_pass@medicos-db:5432/medicos_db
+      RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+    ports:
+      - "3002:3002"
+    networks:
+      - app-network
+    depends_on:
+      - medicos-db
+      - rabbitmq
+
+  # Microservicio de Agendamiento
+  agendamiento-service:
+    build:
+      context: ./microservices/agendamiento-service
+      dockerfile: Dockerfile
+    container_name: agendamiento-service
+    environment:
+      NODE_ENV: development
+      PORT: 3003
+      DATABASE_URL: postgresql://agendamiento_user:agendamiento_pass@agendamiento-db:5432/agendamiento_db
+      RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+      PACIENTES_SERVICE_URL: http://pacientes-service:3001
+      MEDICOS_SERVICE_URL: http://medicos-service:3002
+    ports:
+      - "3003:3003"
+    networks:
+      - app-network
+    depends_on:
+      - agendamiento-db
+      - rabbitmq
+      - pacientes-service
+      - medicos-service
+
+  # Microservicio de Notificaciones
+  notificaciones-service:
+    build:
+      context: ./microservices/notificaciones-service
+      dockerfile: Dockerfile
+    container_name: notificaciones-service
+    environment:
+      NODE_ENV: development
+      PORT: 3004
+      DATABASE_URL: postgresql://notificaciones_user:notificaciones_pass@notificaciones-db:5432/notificaciones_db
+      RABBITMQ_URL: amqp://admin:admin123@rabbitmq:5672
+      PACIENTES_SERVICE_URL: http://pacientes-service:3001
+      MEDICOS_SERVICE_URL: http://medicos-service:3002
+      AGENDAMIENTO_SERVICE_URL: http://agendamiento-service:3003
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: ${SMTP_USER:-tu-email@gmail.com}
+      SMTP_PASS: ${SMTP_PASS:-tu-password-app}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER}
+    ports:
+      - "3004:3004"
+    networks:
+      - app-network
+    depends_on:
+      - notificaciones-db
+      - rabbitmq
+      - pacientes-service
+      - medicos-service
+      - agendamiento-service
+
+  # Frontend - Portal Web
+  frontend:
+    build:
+      context: ./frontend/portal-web
+      dockerfile: Dockerfile
+    container_name: frontend
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    networks:
+      - app-network
+    depends_on:
+      - api-gateway
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  pacientes_data:
+  medicos_data:
+  agendamiento_data:
+  notificaciones_data:
+  rabbitmq_data:

@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Notificacion {
+  id          Int       @id @default(autoincrement())
+  tipo        TipoNotificacion
+  canal       CanalNotificacion
+  destinatario String   // Email o número de teléfono
+  asunto      String?   // Para emails
+  contenido   String
+  estado      EstadoNotificacion @default(PENDIENTE)
+  intentos    Int       @default(0)
+  fechaEnvio  DateTime?
+  fechaCreacion DateTime @default(now())
+  fechaActualizacion DateTime @updatedAt
+  
+  // Metadatos para tracking
+  pacienteId  Int?
+  medicoId    Int?
+  turnoId     Int?
+  eventoId    String?   // ID del evento que generó la notificación
+  
+  // Respuesta del servicio externo
+  respuesta   String?
+  error       String?
+
+  @@map("notificaciones")
+}
+
+model Plantilla {
+  id          Int       @id @default(autoincrement())
+  nombre      String    @unique
+  tipo        TipoNotificacion
+  canal       CanalNotificacion
+  asunto      String?   // Para emails
+  contenido   String
+  variables   String[]  // Array de variables disponibles
+  activa      Boolean   @default(true)
+  fechaCreacion DateTime @default(now())
+  fechaActualizacion DateTime @updatedAt
+
+  @@map("plantillas")
+}
+
+enum TipoNotificacion {
+  AGENDAMIENTO
+  MODIFICACION
+  CANCELACION
+  RECORDATORIO
+  CONFIRMACION
+}
+
+enum CanalNotificacion {
+  EMAIL
+  SMS
+}
+
+enum EstadoNotificacion {
+  PENDIENTE
+  ENVIANDO
+  ENVIADO
+  FALLIDO
+  CANCELADO
+}
