@@ -1,12 +1,12 @@
 #!/bin/sh
+set -e
 
 echo "🚀 Iniciando Microservicio de Notificaciones..."
 
-echo "📊 Ejecutando migraciones de Prisma..."
-npx prisma migrate deploy
+# Esperar a que la base de datos esté lista
+echo "⏳ Esperando a que la base de datos esté lista..."
+sleep 15
 
-echo "🌱 Ejecutando seed de la base de datos..."
-npx prisma db seed
-
+# Iniciar servicio
 echo "🚀 Iniciando servidor Node.js..."
-npm start
+node src/server.js

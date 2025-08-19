@@ -3,6 +3,7 @@ const HistorialCambioRepository = require('../repositories/HistorialCambioReposi
 const Turno = require('../models/Turno');
 const HistorialCambio = require('../models/HistorialCambio');
 const axios = require('axios');
+const amqplib = require('amqplib');
 
 class AgendamientoService {
   constructor() {
@@ -10,6 +11,7 @@ class AgendamientoService {
     this.historialCambioRepository = new HistorialCambioRepository();
     this.pacientesServiceUrl = process.env.PACIENTES_SERVICE_URL;
     this.medicosServiceUrl = process.env.MEDICOS_SERVICE_URL;
+    this.rabbitUrl = process.env.RABBITMQ_URL || 'amqp://admin:admin123@rabbitmq:5672';
   }
 
   async getAllTurnos() {
@@ -162,6 +164,12 @@ class AgendamientoService {
 
       await this.historialCambioRepository.create(historial);
 
+      // Publicar evento de turno creado
+      await this.publicarEvento('cita.confirmada', {
+        tipo: 'TURNO_CREADO',
+        turno: createdTurno
+      });
+
       return new Turno(createdTurno).toJSON();
     } catch (error) {
       throw new Error(`Error en servicio al crear turno: ${error.message}`);
@@ -274,6 +282,13 @@ class AgendamientoService {
 
       await this.historialCambioRepository.create(historial);
 
+      // Publicar evento de turno cancelado
+      await this.publicarEvento('cita.cancelada', {
+        tipo: 'TURNO_CANCELADO',
+        turno: canceledTurno,
+        motivo
+      });
+
       return new Turno(canceledTurno).toJSON();
     } catch (error) {
       throw new Error(`Error en servicio al cancelar turno: ${error.message}`);
@@ -311,6 +326,12 @@ class AgendamientoService {
       );
 
       await this.historialCambioRepository.create(historial);
+
+      // Publicar evento de turno confirmado
+      await this.publicarEvento('cita.confirmada', {
+        tipo: 'TURNO_CONFIRMADO',
+        turno: confirmedTurno
+      });
 
       return new Turno(confirmedTurno).toJSON();
     } catch (error) {
@@ -350,6 +371,12 @@ class AgendamientoService {
 
       await this.historialCambioRepository.create(historial);
 
+      // Publicar evento de turno completado
+      await this.publicarEvento('cita.completada', {
+        tipo: 'TURNO_COMPLETADO',
+        turno: completedTurno
+      });
+
       return new Turno(completedTurno).toJSON();
     } catch (error) {
       throw new Error(`Error en servicio al completar turno: ${error.message}`);
@@ -388,9 +415,32 @@ class AgendamientoService {
 
       await this.historialCambioRepository.create(historial);
 
+      // Publicar evento de no show
+      await this.publicarEvento('cita.no_show', {
+        tipo: 'TURNO_NO_SHOW',
+        turno: noShowTurno
+      });
+
       return new Turno(noShowTurno).toJSON();
     } catch (error) {
       throw new Error(`Error en servicio al marcar turno como no show: ${error.message}`);
+    }
+  }
+
+  async publicarEvento(routingKey, payload) {
+    try {
+      const exchange = 'eventos.citas';
+      const conn = await amqplib.connect(this.rabbitUrl);
+      const ch = await conn.createChannel();
+      await ch.assertExchange(exchange, 'topic', { durable: true });
+      ch.publish(exchange, routingKey, Buffer.from(JSON.stringify(payload)), {
+        contentType: 'application/json',
+        persistent: true
+      });
+      await ch.close();
+      await conn.close();
+    } catch (error) {
+      console.error('Error publicando evento AMQP:', error.message);
     }
   }
 

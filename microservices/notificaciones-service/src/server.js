@@ -5,6 +5,8 @@ const morgan = require('morgan');
 require('dotenv').config();
 
 const notificacionesRoutes = require('./routes/notificaciones');
+const amqplib = require('amqplib');
+const NotificacionService = require('./services/NotificacionService');
 
 const app = express();
 const PORT = process.env.PORT || 3004;
@@ -94,6 +96,52 @@ const server = app.listen(PORT, () => {
   console.log(`   - Agendamiento: ${process.env.AGENDAMIENTO_SERVICE_URL || 'No configurado'}`);
   console.log(`🌐 Ambiente: ${process.env.NODE_ENV || 'development'}`);
 });
+
+// Suscripción a eventos AMQP
+(async () => {
+  try {
+    const rabbitUrl = process.env.RABBITMQ_URL || 'amqp://admin:admin123@rabbitmq:5672';
+    const exchange = 'eventos.citas';
+    const conn = await amqplib.connect(rabbitUrl);
+    const ch = await conn.createChannel();
+    await ch.assertExchange(exchange, 'topic', { durable: true });
+    const q = await ch.assertQueue('notificaciones.citas', { durable: true });
+    await ch.bindQueue(q.queue, exchange, 'cita.*');
+
+    const service = new NotificacionService();
+    ch.consume(q.queue, async (msg) => {
+      if (!msg) return;
+      try {
+        const evento = JSON.parse(msg.content.toString());
+        // Enviar email/sms básico basado en tipo
+        if (evento && evento.turno) {
+          const turno = evento.turno;
+          // Si hay email del paciente, mandar confirmación simple
+          if (turno && turno.paciente_id) {
+            // En un escenario real buscaríamos datos del paciente; aquí sólo dejamos registrado
+            await service.notificacionRepository.create({
+              tipo: evento.tipo || 'EVENTO_CITA',
+              destinatario: 'placeholder@local',
+              asunto: `Evento ${evento.tipo}`,
+              contenido: `Evento ${evento.tipo} para turno ${turno.id}`,
+              canal: 'EMAIL',
+              estado: 'ENVIADO',
+              fechaEnvio: new Date()
+            });
+          }
+        }
+        ch.ack(msg);
+      } catch (e) {
+        console.error('Error procesando mensaje AMQP:', e.message);
+        ch.nack(msg, false, false);
+      }
+    }, { noAck: false });
+
+    console.log('🔔 Suscrito a eventos AMQP en exchange eventos.citas (routing: cita.*)');
+  } catch (e) {
+    console.error('No se pudo suscribir a AMQP:', e.message);
+  }
+})();
 
 // Manejo de señales para cierre graceful
 process.on('SIGTERM', () => {

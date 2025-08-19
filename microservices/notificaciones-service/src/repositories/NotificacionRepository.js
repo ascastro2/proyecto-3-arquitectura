@@ -1,218 +1,275 @@
-const { PrismaClient } = require('@prisma/client');
+const mysql = require('mysql2/promise');
 
 class NotificacionRepository {
   constructor() {
-    this.prisma = new PrismaClient();
+    this.pool = null;
+    this.initializeConnection();
+  }
+
+  async initializeConnection() {
+    try {
+      this.pool = mysql.createPool({
+        host: process.env.DB_HOST || 'notificaciones-db',
+        user: process.env.DB_USER || 'notificaciones_user',
+        password: process.env.DB_PASSWORD || 'notificaciones_pass',
+        database: process.env.DB_NAME || 'notificaciones_db',
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
+        port: process.env.DB_PORT || 3306
+      });
+
+      // Verificar conexión
+      await this.pool.getConnection();
+      console.log('✅ Conexión a MySQL establecida correctamente');
+    } catch (error) {
+      console.error('❌ Error conectando a MySQL:', error);
+      throw error;
+    }
   }
 
   async findAll() {
     try {
-      return await this.prisma.notificacion.findMany({
-        orderBy: { fechaCreacion: 'desc' }
-      });
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM notificaciones ORDER BY fecha_envio DESC'
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error al obtener notificaciones: ${error.message}`);
+      console.error('Error en findAll:', error);
+      throw error;
     }
   }
 
   async findById(id) {
     try {
-      return await this.prisma.notificacion.findUnique({
-        where: { id: parseInt(id) }
-      });
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM notificaciones WHERE id = ?',
+        [id]
+      );
+      return rows[0] || null;
     } catch (error) {
-      throw new Error(`Error al obtener notificación: ${error.message}`);
+      console.error('Error en findById:', error);
+      throw error;
     }
   }
 
   async findByTipo(tipo) {
     try {
-      return await this.prisma.notificacion.findMany({
-        where: { tipo },
-        orderBy: { fechaCreacion: 'desc' }
-      });
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM notificaciones WHERE tipo = ? ORDER BY fecha_envio DESC',
+        [tipo]
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error al obtener notificaciones por tipo: ${error.message}`);
-    }
-  }
-
-  async findByCanal(canal) {
-    try {
-      return await this.prisma.notificacion.findMany({
-        where: { canal },
-        orderBy: { fechaCreacion: 'desc' }
-      });
-    } catch (error) {
-      throw new Error(`Error al obtener notificaciones por canal: ${error.message}`);
+      console.error('Error en findByTipo:', error);
+      throw error;
     }
   }
 
   async findByEstado(estado) {
     try {
-      return await this.prisma.notificacion.findMany({
-        where: { estado },
-        orderBy: { fechaCreacion: 'desc' }
-      });
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM notificaciones WHERE estado = ? ORDER BY fecha_envio DESC',
+        [estado]
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error al obtener notificaciones por estado: ${error.message}`);
+      console.error('Error en findByEstado:', error);
+      throw error;
     }
   }
 
-  async findByPacienteId(pacienteId) {
+  async findByDestinatario(destinatario) {
     try {
-      return await this.prisma.notificacion.findMany({
-        where: { pacienteId: parseInt(pacienteId) },
-        orderBy: { fechaCreacion: 'desc' }
-      });
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM notificaciones WHERE destinatario = ? ORDER BY fecha_envio DESC',
+        [destinatario]
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error al obtener notificaciones del paciente: ${error.message}`);
+      console.error('Error en findByDestinatario:', error);
+      throw error;
     }
   }
 
-  async findByMedicoId(medicoId) {
+  async findByFechaRango(fechaInicio, fechaFin) {
     try {
-      return await this.prisma.notificacion.findMany({
-        where: { medicoId: parseInt(medicoId) },
-        orderBy: { fechaCreacion: 'desc' }
-      });
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM notificaciones WHERE DATE(fecha_envio) BETWEEN ? AND ? ORDER BY fecha_envio DESC',
+        [fechaInicio, fechaFin]
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error al obtener notificaciones del médico: ${error.message}`);
-    }
-  }
-
-  async findByTurnoId(turnoId) {
-    try {
-      return await this.prisma.notificacion.findMany({
-        where: { turnoId: parseInt(turnoId) },
-        orderBy: { fechaCreacion: 'desc' }
-      });
-    } catch (error) {
-      throw new Error(`Error al obtener notificaciones del turno: ${error.message}`);
-    }
-  }
-
-  async findByEventoId(eventoId) {
-    try {
-      return await this.prisma.notificacion.findMany({
-        where: { eventoId },
-        orderBy: { fechaCreacion: 'desc' }
-      });
-    } catch (error) {
-      throw new Error(`Error al obtener notificaciones del evento: ${error.message}`);
-    }
-  }
-
-  async findPendientes() {
-    try {
-      return await this.prisma.notificacion.findMany({
-        where: { estado: 'PENDIENTE' },
-        orderBy: { fechaCreacion: 'asc' }
-      });
-    } catch (error) {
-      throw new Error(`Error al obtener notificaciones pendientes: ${error.message}`);
+      console.error('Error en findByFechaRango:', error);
+      throw error;
     }
   }
 
   async create(notificacionData) {
     try {
-      return await this.prisma.notificacion.create({
-        data: notificacionData
-      });
+      const [result] = await this.pool.execute(
+        `INSERT INTO notificaciones (tipo, destinatario, asunto, contenido, canal, estado, fecha_envio, fecha_entrega, intentos, error_mensaje) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          notificacionData.tipo,
+          notificacionData.destinatario,
+          notificacionData.asunto,
+          notificacionData.contenido,
+          notificacionData.canal,
+          notificacionData.estado || 'PENDIENTE',
+          notificacionData.fechaEnvio || new Date(),
+          notificacionData.fechaEntrega || null,
+          notificacionData.intentos || 0,
+          notificacionData.errorMensaje || null
+        ]
+      );
+      
+      return { id: result.insertId, ...notificacionData };
     } catch (error) {
-      throw new Error(`Error al crear notificación: ${error.message}`);
+      console.error('Error en create:', error);
+      throw error;
     }
   }
 
   async update(id, notificacionData) {
     try {
-      return await this.prisma.notificacion.update({
-        where: { id: parseInt(id) },
-        data: notificacionData
-      });
+      const [result] = await this.pool.execute(
+        `UPDATE notificaciones 
+         SET tipo = ?, destinatario = ?, asunto = ?, contenido = ?, canal = ?, 
+             estado = ?, fecha_envio = ?, fecha_entrega = ?, intentos = ?, 
+             error_mensaje = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [
+          notificacionData.tipo,
+          notificacionData.destinatario,
+          notificacionData.asunto,
+          notificacionData.contenido,
+          notificacionData.canal,
+          notificacionData.estado,
+          notificacionData.fechaEnvio,
+          notificacionData.fechaEntrega,
+          notificacionData.intentos,
+          notificacionData.errorMensaje,
+          id
+        ]
+      );
+      
+      if (result.affectedRows === 0) {
+        return null;
+      }
+      
+      return { id, ...notificacionData };
     } catch (error) {
-      throw new Error(`Error al actualizar notificación: ${error.message}`);
+      console.error('Error en update:', error);
+      throw error;
+    }
+  }
+
+  async updateEstado(id, estado, fechaEntrega = null, errorMensaje = null) {
+    try {
+      const [result] = await this.pool.execute(
+        'UPDATE notificaciones SET estado = ?, fecha_entrega = ?, error_mensaje = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [estado, fechaEntrega, errorMensaje, id]
+      );
+      
+      if (result.affectedRows === 0) {
+        return null;
+      }
+      
+      return { id, estado, fechaEntrega, errorMensaje };
+    } catch (error) {
+      console.error('Error en updateEstado:', error);
+      throw error;
+    }
+  }
+
+  async incrementarIntentos(id) {
+    try {
+      const [result] = await this.pool.execute(
+        'UPDATE notificaciones SET intentos = intentos + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [id]
+      );
+      
+      if (result.affectedRows === 0) {
+        return null;
+      }
+      
+      return { id, intentos: 'incrementado' };
+    } catch (error) {
+      console.error('Error en incrementarIntentos:', error);
+      throw error;
     }
   }
 
   async delete(id) {
     try {
-      return await this.prisma.notificacion.delete({
-        where: { id: parseInt(id) }
-      });
-    } catch (error) {
-      throw new Error(`Error al eliminar notificación: ${error.message}`);
-    }
-  }
-
-  async updateEstado(id, estado, respuesta = null, error = null) {
-    try {
-      const updateData = { estado };
+      const [result] = await this.pool.execute(
+        'DELETE FROM notificaciones WHERE id = ?',
+        [id]
+      );
       
-      if (estado === 'ENVIADO') {
-        updateData.fechaEnvio = new Date();
-        updateData.respuesta = respuesta;
-      } else if (estado === 'FALLIDO') {
-        updateData.error = error;
-        updateData.intentos = { increment: 1 };
-      }
-
-      return await this.prisma.notificacion.update({
-        where: { id: parseInt(id) },
-        data: updateData
-      });
+      return result.affectedRows > 0;
     } catch (error) {
-      throw new Error(`Error al actualizar estado de notificación: ${error.message}`);
+      console.error('Error en delete:', error);
+      throw error;
     }
   }
 
   async search(query) {
     try {
-      return await this.prisma.notificacion.findMany({
-        where: {
-          OR: [
-            { contenido: { contains: query, mode: 'insensitive' } },
-            { destinatario: { contains: query, mode: 'insensitive' } },
-            { asunto: { contains: query, mode: 'insensitive' } }
-          ]
-        },
-        orderBy: { fechaCreacion: 'desc' }
-      });
+      const searchTerm = `%${query}%`;
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM notificaciones WHERE asunto LIKE ? OR contenido LIKE ? ORDER BY fecha_envio DESC',
+        [searchTerm, searchTerm]
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error en búsqueda de notificaciones: ${error.message}`);
+      console.error('Error en search:', error);
+      throw error;
     }
   }
 
-  async getEstadisticas(fechaInicio, fechaFin) {
+  async getEstadisticas() {
     try {
-      const whereClause = {};
-      if (fechaInicio && fechaFin) {
-        whereClause.fechaCreacion = {
-          gte: new Date(fechaInicio),
-          lte: new Date(fechaFin)
-        };
-      }
-
-      const [total, enviadas, fallidas, pendientes] = await Promise.all([
-        this.prisma.notificacion.count({ where: whereClause }),
-        this.prisma.notificacion.count({ where: { ...whereClause, estado: 'ENVIADO' } }),
-        this.prisma.notificacion.count({ where: { ...whereClause, estado: 'FALLIDO' } }),
-        this.prisma.notificacion.count({ where: { ...whereClause, estado: 'PENDIENTE' } })
-      ]);
-
-      return {
-        total,
-        enviadas,
-        fallidas,
-        pendientes,
-        tasaExito: total > 0 ? ((enviadas / total) * 100).toFixed(2) : 0
-      };
+      const [rows] = await this.pool.execute(
+        `SELECT 
+           tipo,
+           canal,
+           estado,
+           COUNT(*) as cantidad,
+           DATE(fecha_envio) as fecha
+         FROM notificaciones 
+         WHERE fecha_envio >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+         GROUP BY tipo, canal, estado, DATE(fecha_envio)
+         ORDER BY fecha DESC`
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error al obtener estadísticas: ${error.message}`);
+      console.error('Error en getEstadisticas:', error);
+      throw error;
     }
   }
 
-  async disconnect() {
-    await this.prisma.$disconnect();
+  async getPendientes() {
+    try {
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM notificaciones WHERE estado = "PENDIENTE" AND intentos < 3 ORDER BY fecha_envio ASC'
+      );
+      return rows;
+    } catch (error) {
+      console.error('Error en getPendientes:', error);
+      throw error;
+    }
+  }
+
+  async getConnection() {
+    return await this.pool.getConnection();
+  }
+
+  async closeConnection() {
+    if (this.pool) {
+      await this.pool.end();
+    }
   }
 }
 

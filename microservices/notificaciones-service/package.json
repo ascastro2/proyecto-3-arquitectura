@@ -7,11 +7,6 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "build": "echo 'Build completed'",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev --name init",
-    "prisma:deploy": "prisma migrate deploy",
-    "db:seed": "prisma db seed",
-    "postinstall": "prisma generate",
     "test": "echo 'No tests specified'"
   },
   "keywords": [
@@ -34,8 +29,7 @@
     "morgan": "^1.10.0",
     "dotenv": "^16.3.1",
     "joi": "^17.11.0",
-    "prisma": "^5.7.1",
-    "@prisma/client": "^5.7.1",
+    "mysql2": "^3.6.0",
     "amqplib": "^0.10.3",
     "winston": "^3.11.0",
     "axios": "^1.6.0",
@@ -45,9 +39,7 @@
   "devDependencies": {
     "nodemon": "^3.0.2"
   },
-  "prisma": {
-    "seed": "node prisma/seed.js"
-  },
+
   "engines": {
     "node": ">=18.0.0"
   }

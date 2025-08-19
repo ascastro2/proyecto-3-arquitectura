@@ -1,169 +1,140 @@
-const { PrismaClient } = require('@prisma/client');
+const mysql = require('mysql2/promise');
 
 class DisponibilidadRepository {
   constructor() {
-    this.prisma = new PrismaClient();
+    this.pool = null;
+    this.initializeConnection();
+  }
+
+  async initializeConnection() {
+    try {
+      this.pool = mysql.createPool({
+        host: process.env.DB_HOST || 'medicos-db',
+        user: process.env.DB_USER || 'medicos_user',
+        password: process.env.DB_PASSWORD || 'medicos_pass',
+        database: process.env.DB_NAME || 'medicos_db',
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
+        port: process.env.DB_PORT || 3306
+      });
+
+      // Verificar conexión
+      await this.pool.getConnection();
+      console.log('✅ Conexión a MySQL establecida correctamente');
+    } catch (error) {
+      console.error('❌ Error conectando a MySQL:', error);
+      throw error;
+    }
   }
 
   async findByMedicoId(medicoId) {
     try {
-      const disponibilidades = await this.prisma.disponibilidad.findMany({
-        where: { 
-          medicoId: parseInt(medicoId),
-          activo: true
-        },
-        orderBy: [
-          { diaSemana: 'asc' },
-          { horaInicio: 'asc' }
-        ]
-      });
-      return disponibilidades;
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM disponibilidades WHERE medico_id = ? AND activo = true ORDER BY dia_semana, hora_inicio',
+        [medicoId]
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error al obtener disponibilidades del médico ${medicoId}: ${error.message}`);
+      console.error('Error en findByMedicoId:', error);
+      throw error;
     }
   }
 
   async findById(id) {
     try {
-      const disponibilidad = await this.prisma.disponibilidad.findUnique({
-        where: { id: parseInt(id) }
-      });
-      return disponibilidad;
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM disponibilidades WHERE id = ? AND activo = true',
+        [id]
+      );
+      return rows[0] || null;
     } catch (error) {
-      throw new Error(`Error al obtener disponibilidad con ID ${id}: ${error.message}`);
+      console.error('Error en findById:', error);
+      throw error;
     }
   }
 
   async create(disponibilidadData) {
     try {
-      const disponibilidad = await this.prisma.disponibilidad.create({
-        data: {
-          medicoId: parseInt(disponibilidadData.medicoId),
-          diaSemana: disponibilidadData.diaSemana,
-          horaInicio: disponibilidadData.horaInicio,
-          horaFin: disponibilidadData.horaFin,
-          activo: disponibilidadData.activo !== undefined ? disponibilidadData.activo : true
-        }
-      });
-      return disponibilidad;
+      const [result] = await this.pool.execute(
+        `INSERT INTO disponibilidades (medico_id, dia_semana, hora_inicio, hora_fin) 
+         VALUES (?, ?, ?, ?)`,
+        [
+          disponibilidadData.medicoId,
+          disponibilidadData.diaSemana,
+          disponibilidadData.horaInicio,
+          disponibilidadData.horaFin
+        ]
+      );
+      
+      return { id: result.insertId, ...disponibilidadData };
     } catch (error) {
-      if (error.code === 'P2003') {
-        throw new Error('El médico especificado no existe');
-      }
-      throw new Error(`Error al crear disponibilidad: ${error.message}`);
+      console.error('Error en create:', error);
+      throw error;
     }
   }
 
   async update(id, disponibilidadData) {
     try {
-      const updateData = {};
+      const [result] = await this.pool.execute(
+        `UPDATE disponibilidades 
+         SET dia_semana = ?, hora_inicio = ?, hora_fin = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND activo = true`,
+        [
+          disponibilidadData.diaSemana,
+          disponibilidadData.horaInicio,
+          disponibilidadData.horaFin,
+          id
+        ]
+      );
       
-      if (disponibilidadData.medicoId) updateData.medicoId = parseInt(disponibilidadData.medicoId);
-      if (disponibilidadData.diaSemana !== undefined) updateData.diaSemana = disponibilidadData.diaSemana;
-      if (disponibilidadData.horaInicio) updateData.horaInicio = disponibilidadData.horaInicio;
-      if (disponibilidadData.horaFin) updateData.horaFin = disponibilidadData.horaFin;
-      if (disponibilidadData.activo !== undefined) updateData.activo = disponibilidadData.activo;
-
-      const disponibilidad = await this.prisma.disponibilidad.update({
-        where: { id: parseInt(id) },
-        data: updateData
-      });
-      return disponibilidad;
+      if (result.affectedRows === 0) {
+        return null;
+      }
+      
+      return { id, ...disponibilidadData };
     } catch (error) {
-      if (error.code === 'P2025') {
-        throw new Error(`Disponibilidad con ID ${id} no encontrada`);
-      }
-      if (error.code === 'P2003') {
-        throw new Error('El médico especificado no existe');
-      }
-      throw new Error(`Error al actualizar disponibilidad: ${error.message}`);
+      console.error('Error en update:', error);
+      throw error;
     }
   }
 
   async delete(id) {
     try {
-      // Soft delete: marcar como inactiva
-      const disponibilidad = await this.prisma.disponibilidad.update({
-        where: { id: parseInt(id) },
-        data: { activo: false }
-      });
-      return disponibilidad;
-    } catch (error) {
-      if (error.code === 'P2025') {
-        throw new Error(`Disponibilidad con ID ${id} no encontrada`);
-      }
-      throw new Error(`Error al eliminar disponibilidad: ${error.message}`);
-    }
-  }
-
-  async checkDisponibilidad(medicoId, diaSemana, hora) {
-    try {
-      const disponibilidades = await this.prisma.disponibilidad.findMany({
-        where: {
-          medicoId: parseInt(medicoId),
-          diaSemana: parseInt(diaSemana),
-          activo: true
-        }
-      });
-
-      // Verificar si la hora está dentro de algún rango de disponibilidad
-      const horaMinutos = this.horaAMinutos(hora);
+      const [result] = await this.pool.execute(
+        'UPDATE disponibilidades SET activo = false, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [id]
+      );
       
-      for (const disp of disponibilidades) {
-        const inicioMinutos = this.horaAMinutos(disp.horaInicio);
-        const finMinutos = this.horaAMinutos(disp.horaFin);
-        
-        if (horaMinutos >= inicioMinutos && horaMinutos < finMinutos) {
-          return true;
-        }
-      }
-      
-      return false;
+      return result.affectedRows > 0;
     } catch (error) {
-      throw new Error(`Error al verificar disponibilidad: ${error.message}`);
-    }
-  }
-
-  async getHorariosDisponibles(medicoId, diaSemana) {
-    try {
-      const disponibilidades = await this.prisma.disponibilidad.findMany({
-        where: {
-          medicoId: parseInt(medicoId),
-          diaSemana: parseInt(diaSemana),
-          activo: true
-        },
-        orderBy: { horaInicio: 'asc' }
-      });
-
-      return disponibilidades.map(disp => ({
-        horaInicio: disp.horaInicio,
-        horaFin: disp.horaFin
-      }));
-    } catch (error) {
-      throw new Error(`Error al obtener horarios disponibles: ${error.message}`);
+      console.error('Error en delete:', error);
+      throw error;
     }
   }
 
   async deleteByMedicoId(medicoId) {
     try {
-      // Marcar todas las disponibilidades del médico como inactivas
-      await this.prisma.disponibilidad.updateMany({
-        where: { medicoId: parseInt(medicoId) },
-        data: { activo: false }
-      });
-      return true;
+      const [result] = await this.pool.execute(
+        'UPDATE disponibilidades SET activo = false, updated_at = CURRENT_TIMESTAMP WHERE medico_id = ?',
+        [medicoId]
+      );
+      
+      return result.affectedRows > 0;
     } catch (error) {
-      throw new Error(`Error al eliminar disponibilidades del médico: ${error.message}`);
+      console.error('Error en deleteByMedicoId:', error);
+      throw error;
     }
   }
 
-  horaAMinutos(hora) {
-    const [horas, minutos] = hora.split(':').map(Number);
-    return horas * 60 + minutos;
+  async getConnection() {
+    return await this.pool.getConnection();
   }
 
-  async disconnect() {
-    await this.prisma.$disconnect();
+  async closeConnection() {
+    if (this.pool) {
+      await this.pool.end();
+    }
   }
 }
 

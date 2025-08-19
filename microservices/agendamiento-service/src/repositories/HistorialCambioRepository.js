@@ -1,181 +1,134 @@
-const { PrismaClient } = require('@prisma/client');
+const mysql = require('mysql2/promise');
 
 class HistorialCambioRepository {
   constructor() {
-    this.prisma = new PrismaClient();
+    this.pool = null;
+    this.initializeConnection();
+  }
+
+  async initializeConnection() {
+    try {
+      this.pool = mysql.createPool({
+        host: process.env.DB_HOST || 'agendamiento-db',
+        user: process.env.DB_USER || 'agendamiento_user',
+        password: process.env.DB_PASSWORD || 'agendamiento_pass',
+        database: process.env.DB_NAME || 'agendamiento_db',
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
+        port: process.env.DB_PORT || 3306
+      });
+
+      // Verificar conexión
+      await this.pool.getConnection();
+      console.log('✅ Conexión a MySQL establecida correctamente');
+    } catch (error) {
+      console.error('❌ Error conectando a MySQL:', error);
+      throw error;
+    }
   }
 
   async findByTurnoId(turnoId) {
     try {
-      const historial = await this.prisma.historialCambio.findMany({
-        where: { turnoId: parseInt(turnoId) },
-        orderBy: { fechaCambio: 'desc' }
-      });
-      return historial;
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM historial_cambios WHERE turno_id = ? ORDER BY fecha_cambio DESC',
+        [turnoId]
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error al obtener historial del turno ${turnoId}: ${error.message}`);
+      console.error('Error en findByTurnoId:', error);
+      throw error;
     }
   }
 
   async findById(id) {
     try {
-      const historial = await this.prisma.historialCambio.findUnique({
-        where: { id: parseInt(id) }
-      });
-      return historial;
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM historial_cambios WHERE id = ?',
+        [id]
+      );
+      return rows[0] || null;
     } catch (error) {
-      throw new Error(`Error al obtener historial con ID ${id}: ${error.message}`);
-    }
-  }
-
-  async findByTipoCambio(tipoCambio) {
-    try {
-      const historial = await this.prisma.historialCambio.findMany({
-        where: { tipoCambio },
-        orderBy: { fechaCambio: 'desc' },
-        include: {
-          turno: true
-        }
-      });
-      return historial;
-    } catch (error) {
-      throw new Error(`Error al obtener historial por tipo de cambio: ${error.message}`);
-    }
-  }
-
-  async findByFechaRango(fechaInicio, fechaFin) {
-    try {
-      const inicio = new Date(fechaInicio);
-      inicio.setHours(0, 0, 0, 0);
-      
-      const fin = new Date(fechaFin);
-      fin.setHours(23, 59, 59, 999);
-
-      const historial = await this.prisma.historialCambio.findMany({
-        where: {
-          fechaCambio: {
-            gte: inicio,
-            lte: fin
-          }
-        },
-        orderBy: { fechaCambio: 'desc' },
-        include: {
-          turno: true
-        }
-      });
-      return historial;
-    } catch (error) {
-      throw new Error(`Error al obtener historial en el rango de fechas: ${error.message}`);
+      console.error('Error en findById:', error);
+      throw error;
     }
   }
 
   async create(historialData) {
     try {
-      const historial = await this.prisma.historialCambio.create({
-        data: {
-          turnoId: parseInt(historialData.turnoId),
-          tipoCambio: historialData.tipoCambio,
-          descripcion: historialData.descripcion,
-          fechaCambio: historialData.fechaCambio || new Date(),
-          usuarioId: historialData.usuarioId ? parseInt(historialData.usuarioId) : null,
-          datosAnteriores: historialData.datosAnteriores || null,
-          datosNuevos: historialData.datosNuevos || null
-        }
-      });
-      return historial;
-    } catch (error) {
-      if (error.code === 'P2003') {
-        throw new Error('El turno especificado no existe');
-      }
-      throw new Error(`Error al crear historial: ${error.message}`);
-    }
-  }
-
-  async update(id, historialData) {
-    try {
-      const updateData = {};
+      const [result] = await this.pool.execute(
+        `INSERT INTO historial_cambios (turno_id, tipo_cambio, descripcion, usuario_id, datos_anteriores, datos_nuevos) 
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          historialData.turnoId,
+          historialData.tipoCambio,
+          historialData.descripcion,
+          historialData.usuarioId || null,
+          historialData.datosAnteriores ? JSON.stringify(historialData.datosAnteriores) : null,
+          historialData.datosNuevos ? JSON.stringify(historialData.datosNuevos) : null
+        ]
+      );
       
-      if (historialData.turnoId) updateData.turnoId = parseInt(historialData.turnoId);
-      if (historialData.tipoCambio) updateData.tipoCambio = historialData.tipoCambio;
-      if (historialData.descripcion) updateData.descripcion = historialData.descripcion;
-      if (historialData.fechaCambio) updateData.fechaCambio = new Date(historialData.fechaCambio);
-      if (historialData.usuarioId !== undefined) updateData.usuarioId = historialData.usuarioId ? parseInt(historialData.usuarioId) : null;
-      if (historialData.datosAnteriores !== undefined) updateData.datosAnteriores = historialData.datosAnteriores;
-      if (historialData.datosNuevos !== undefined) updateData.datosNuevos = historialData.datosNuevos;
-
-      const historial = await this.prisma.historialCambio.update({
-        where: { id: parseInt(id) },
-        data: updateData
-      });
-      return historial;
+      return { id: result.insertId, ...historialData };
     } catch (error) {
-      if (error.code === 'P2025') {
-        throw new Error(`Historial con ID ${id} no encontrado`);
-      }
-      if (error.code === 'P2003') {
-        throw new Error('El turno especificado no existe');
-      }
-      throw new Error(`Error al actualizar historial: ${error.message}`);
+      console.error('Error en create:', error);
+      throw error;
     }
   }
 
-  async delete(id) {
+  async findByTipoCambio(tipoCambio) {
     try {
-      const historial = await this.prisma.historialCambio.delete({
-        where: { id: parseInt(id) }
-      });
-      return historial;
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM historial_cambios WHERE tipo_cambio = ? ORDER BY fecha_cambio DESC',
+        [tipoCambio]
+      );
+      return rows;
     } catch (error) {
-      if (error.code === 'P2025') {
-        throw new Error(`Historial con ID ${id} no encontrado`);
-      }
-      throw new Error(`Error al eliminar historial: ${error.message}`);
+      console.error('Error en findByTipoCambio:', error);
+      throw error;
     }
   }
 
-  async deleteByTurnoId(turnoId) {
+  async findByFechaRango(fechaInicio, fechaFin) {
     try {
-      await this.prisma.historialCambio.deleteMany({
-        where: { turnoId: parseInt(turnoId) }
-      });
-      return true;
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM historial_cambios WHERE DATE(fecha_cambio) BETWEEN ? AND ? ORDER BY fecha_cambio DESC',
+        [fechaInicio, fechaFin]
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error al eliminar historial del turno: ${error.message}`);
+      console.error('Error en findByFechaRango:', error);
+      throw error;
     }
   }
 
-  async getEstadisticas(fechaInicio, fechaFin) {
+  async getEstadisticasCambios() {
     try {
-      const inicio = new Date(fechaInicio);
-      inicio.setHours(0, 0, 0, 0);
-      
-      const fin = new Date(fechaFin);
-      fin.setHours(23, 59, 59, 999);
-
-      const estadisticas = await this.prisma.historialCambio.groupBy({
-        by: ['tipoCambio'],
-        where: {
-          fechaCambio: {
-            gte: inicio,
-            lte: fin
-          }
-        },
-        _count: {
-          tipoCambio: true
-        }
-      });
-
-      return estadisticas.map(stat => ({
-        tipoCambio: stat.tipoCambio,
-        cantidad: stat._count.tipoCambio
-      }));
+      const [rows] = await this.pool.execute(
+        `SELECT 
+           tipo_cambio,
+           COUNT(*) as cantidad,
+           DATE(fecha_cambio) as fecha
+         FROM historial_cambios 
+         WHERE fecha_cambio >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+         GROUP BY tipo_cambio, DATE(fecha_cambio)
+         ORDER BY fecha DESC`
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error al obtener estadísticas: ${error.message}`);
+      console.error('Error en getEstadisticasCambios:', error);
+      throw error;
     }
   }
 
-  async disconnect() {
-    await this.prisma.$disconnect();
+  async getConnection() {
+    return await this.pool.getConnection();
+  }
+
+  async closeConnection() {
+    if (this.pool) {
+      await this.pool.end();
+    }
   }
 }
 

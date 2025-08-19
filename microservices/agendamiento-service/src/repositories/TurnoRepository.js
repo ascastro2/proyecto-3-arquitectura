@@ -1,382 +1,344 @@
-const { PrismaClient } = require('@prisma/client');
+const mysql = require('mysql2/promise');
 
 class TurnoRepository {
   constructor() {
-    this.prisma = new PrismaClient();
+    this.pool = null;
+    this.initializeConnection();
+  }
+
+  async initializeConnection() {
+    try {
+      this.pool = mysql.createPool({
+        host: process.env.DB_HOST || 'agendamiento-db',
+        user: process.env.DB_USER || 'agendamiento_user',
+        password: process.env.DB_PASSWORD || 'agendamiento_pass',
+        database: process.env.DB_NAME || 'agendamiento_db',
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
+        port: process.env.DB_PORT || 3306
+      });
+
+      // Verificar conexión
+      await this.pool.getConnection();
+      console.log('✅ Conexión a MySQL establecida correctamente');
+    } catch (error) {
+      console.error('❌ Error conectando a MySQL:', error);
+      throw error;
+    }
   }
 
   async findAll() {
     try {
-      const turnos = await this.prisma.turno.findMany({
-        orderBy: [
-          { fecha: 'asc' },
-          { hora: 'asc' }
-        ],
-        include: {
-          historialCambios: {
-            orderBy: { fechaCambio: 'desc' }
-          }
-        }
-      });
-      return turnos;
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM turnos ORDER BY fecha, hora DESC'
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error al obtener turnos: ${error.message}`);
+      console.error('Error en findAll:', error);
+      throw error;
     }
   }
 
   async findById(id) {
     try {
-      const turno = await this.prisma.turno.findUnique({
-        where: { id: parseInt(id) },
-        include: {
-          historialCambios: {
-            orderBy: { fechaCambio: 'desc' }
-          }
-        }
-      });
-      return turno;
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM turnos WHERE id = ?',
+        [id]
+      );
+      return rows[0] || null;
     } catch (error) {
-      throw new Error(`Error al obtener turno con ID ${id}: ${error.message}`);
+      console.error('Error en findById:', error);
+      throw error;
     }
   }
 
   async findByPacienteId(pacienteId) {
     try {
-      const turnos = await this.prisma.turno.findMany({
-        where: { pacienteId: parseInt(pacienteId) },
-        orderBy: [
-          { fecha: 'asc' },
-          { hora: 'asc' }
-        ],
-        include: {
-          historialCambios: {
-            orderBy: { fechaCambio: 'desc' }
-          }
-        }
-      });
-      return turnos;
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM turnos WHERE paciente_id = ? ORDER BY fecha, hora DESC',
+        [pacienteId]
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error al obtener turnos del paciente ${pacienteId}: ${error.message}`);
+      console.error('Error en findByPacienteId:', error);
+      throw error;
     }
   }
 
   async findByMedicoId(medicoId) {
     try {
-      const turnos = await this.prisma.turno.findMany({
-        where: { medicoId: parseInt(medicoId) },
-        orderBy: [
-          { fecha: 'asc' },
-          { hora: 'asc' }
-        ],
-        include: {
-          historialCambios: {
-            orderBy: { fechaCambio: 'desc' }
-          }
-        }
-      });
-      return turnos;
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM turnos WHERE medico_id = ? ORDER BY fecha, hora DESC',
+        [medicoId]
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error al obtener turnos del médico ${medicoId}: ${error.message}`);
+      console.error('Error en findByMedicoId:', error);
+      throw error;
     }
   }
 
   async findByEstado(estado) {
     try {
-      const turnos = await this.prisma.turno.findMany({
-        where: { estado },
-        orderBy: [
-          { fecha: 'asc' },
-          { hora: 'asc' }
-        ],
-        include: {
-          historialCambios: {
-            orderBy: { fechaCambio: 'desc' }
-          }
-        }
-      });
-      return turnos;
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM turnos WHERE estado = ? ORDER BY fecha, hora DESC',
+        [estado]
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error al obtener turnos con estado ${estado}: ${error.message}`);
+      console.error('Error en findByEstado:', error);
+      throw error;
     }
   }
 
   async findByFecha(fecha) {
     try {
-      const fechaInicio = new Date(fecha);
-      fechaInicio.setHours(0, 0, 0, 0);
-      
-      const fechaFin = new Date(fecha);
-      fechaFin.setHours(23, 59, 59, 999);
-
-      const turnos = await this.prisma.turno.findMany({
-        where: {
-          fecha: {
-            gte: fechaInicio,
-            lte: fechaFin
-          }
-        },
-        orderBy: [
-          { fecha: 'asc' },
-          { hora: 'asc' }
-        ],
-        include: {
-          historialCambios: {
-            orderBy: { fechaCambio: 'desc' }
-          }
-        }
-      });
-      return turnos;
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM turnos WHERE DATE(fecha) = ? ORDER BY hora ASC',
+        [fecha]
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error al obtener turnos para la fecha ${fecha}: ${error.message}`);
+      console.error('Error en findByFecha:', error);
+      throw error;
     }
   }
 
   async findByFechaRango(fechaInicio, fechaFin) {
     try {
-      const inicio = new Date(fechaInicio);
-      inicio.setHours(0, 0, 0, 0);
-      
-      const fin = new Date(fechaFin);
-      fin.setHours(23, 59, 59, 999);
-
-      const turnos = await this.prisma.turno.findMany({
-        where: {
-          fecha: {
-            gte: inicio,
-            lte: fin
-          }
-        },
-        orderBy: [
-          { fecha: 'asc' },
-          { hora: 'asc' }
-        ],
-        include: {
-          historialCambios: {
-            orderBy: { fechaCambio: 'desc' }
-          }
-        }
-      });
-      return turnos;
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM turnos WHERE fecha BETWEEN ? AND ? ORDER BY fecha ASC, hora ASC',
+        [fechaInicio, fechaFin]
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error al obtener turnos en el rango de fechas: ${error.message}`);
+      console.error('Error en findByFechaRango:', error);
+      throw error;
+    }
+  }
+
+  async findByMedicoAndFecha(medicoId, fecha) {
+    try {
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM turnos WHERE medico_id = ? AND DATE(fecha) = ? ORDER BY hora ASC',
+        [medicoId, fecha]
+      );
+      return rows;
+    } catch (error) {
+      console.error('Error en findByMedicoAndFecha:', error);
+      throw error;
     }
   }
 
   async checkDisponibilidad(medicoId, fecha, hora) {
     try {
-      const fechaHora = new Date(fecha);
-      const [horas, minutos] = hora.split(':').map(Number);
-      fechaHora.setHours(horas, minutos, 0, 0);
-      
-      const fechaInicio = new Date(fechaHora);
-      fechaInicio.setMinutes(fechaHora.getMinutes() - 30); // 30 min antes
-      
-      const fechaFin = new Date(fechaHora);
-      fechaFin.setMinutes(fechaHora.getMinutes() + 30); // 30 min después
-
-      const turnosExistentes = await this.prisma.turno.findMany({
-        where: {
-          medicoId: parseInt(medicoId),
-          fecha: {
-            gte: fechaInicio,
-            lte: fechaFin
-          },
-          estado: {
-            notIn: ['CANCELADO', 'NO_SHOW']
-          }
-        }
-      });
-
-      return turnosExistentes.length === 0;
+      // Considera colisión exacta de hora en la misma fecha para el mismo médico, excepto cancelados/no show
+      const [rows] = await this.pool.execute(
+        `SELECT 1 FROM turnos 
+         WHERE medico_id = ? AND DATE(fecha) = DATE(?) AND hora = ? 
+           AND estado NOT IN ('CANCELADO','NO_SHOW')
+         LIMIT 1`,
+        [medicoId, fecha, hora]
+      );
+      return rows.length === 0;
     } catch (error) {
-      throw new Error(`Error al verificar disponibilidad: ${error.message}`);
+      console.error('Error en checkDisponibilidad:', error);
+      throw error;
     }
   }
 
   async create(turnoData) {
     try {
-      const turno = await this.prisma.turno.create({
-        data: {
-          pacienteId: parseInt(turnoData.pacienteId),
-          medicoId: parseInt(turnoData.medicoId),
-          fecha: new Date(turnoData.fecha),
-          hora: turnoData.hora,
-          diaSemana: turnoData.diaSemana,
-          estado: turnoData.estado || 'PENDIENTE',
-          motivo: turnoData.motivo,
-          observaciones: turnoData.observaciones
-        },
-        include: {
-          historialCambios: true
-        }
-      });
-      return turno;
+      const [result] = await this.pool.execute(
+        `INSERT INTO turnos (paciente_id, medico_id, fecha, hora, dia_semana, estado, motivo, observaciones) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          turnoData.pacienteId,
+          turnoData.medicoId,
+          turnoData.fecha,
+          turnoData.hora,
+          turnoData.diaSemana,
+          turnoData.estado || 'PENDIENTE',
+          turnoData.motivo || null,
+          turnoData.observaciones || null
+        ]
+      );
+      
+      return { id: result.insertId, ...turnoData };
     } catch (error) {
-      if (error.code === 'P2003') {
-        throw new Error('El paciente o médico especificado no existe');
-      }
-      throw new Error(`Error al crear turno: ${error.message}`);
+      console.error('Error en create:', error);
+      throw error;
     }
   }
 
   async update(id, turnoData) {
     try {
-      const updateData = {};
+      const [result] = await this.pool.execute(
+        `UPDATE turnos 
+         SET paciente_id = ?, medico_id = ?, fecha = ?, hora = ?, dia_semana = ?, 
+             estado = ?, motivo = ?, observaciones = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [
+          turnoData.pacienteId,
+          turnoData.medicoId,
+          turnoData.fecha,
+          turnoData.hora,
+          turnoData.diaSemana,
+          turnoData.estado,
+          turnoData.motivo || null,
+          turnoData.observaciones || null,
+          id
+        ]
+      );
       
-      if (turnoData.pacienteId) updateData.pacienteId = parseInt(turnoData.pacienteId);
-      if (turnoData.medicoId) updateData.medicoId = parseInt(turnoData.medicoId);
-      if (turnoData.fecha) updateData.fecha = new Date(turnoData.fecha);
-      if (turnoData.hora) updateData.hora = turnoData.hora;
-      if (turnoData.diaSemana !== undefined) updateData.diaSemana = turnoData.diaSemana;
-      if (turnoData.estado) updateData.estado = turnoData.estado;
-      if (turnoData.motivo !== undefined) updateData.motivo = turnoData.motivo;
-      if (turnoData.observaciones !== undefined) updateData.observaciones = turnoData.observaciones;
-
-      const turno = await this.prisma.turno.update({
-        where: { id: parseInt(id) },
-        data: updateData,
-        include: {
-          historialCambios: {
-            orderBy: { fechaCambio: 'desc' }
-          }
-        }
-      });
-      return turno;
+      if (result.affectedRows === 0) {
+        return null;
+      }
+      
+      return { id, ...turnoData };
     } catch (error) {
-      if (error.code === 'P2025') {
-        throw new Error(`Turno con ID ${id} no encontrado`);
-      }
-      if (error.code === 'P2003') {
-        throw new Error('El paciente o médico especificado no existe');
-      }
-      throw new Error(`Error al actualizar turno: ${error.message}`);
-    }
-  }
-
-  async delete(id) {
-    try {
-      const turno = await this.prisma.turno.delete({
-        where: { id: parseInt(id) }
-      });
-      return turno;
-    } catch (error) {
-      if (error.code === 'P2025') {
-        throw new Error(`Turno con ID ${id} no encontrado`);
-      }
-      throw new Error(`Error al eliminar turno: ${error.message}`);
+      console.error('Error en update:', error);
+      throw error;
     }
   }
 
   async cancelarTurno(id, motivo) {
     try {
-      const turno = await this.prisma.turno.update({
-        where: { id: parseInt(id) },
-        data: { 
-          estado: 'CANCELADO',
-          motivo: motivo || 'Turno cancelado'
-        },
-        include: {
-          historialCambios: {
-            orderBy: { fechaCambio: 'desc' }
-          }
-        }
-      });
+      const [result] = await this.pool.execute(
+        'UPDATE turnos SET estado = \'CANCELADO\', observaciones = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [motivo || 'Turno cancelado', id]
+      );
+      if (result.affectedRows === 0) return null;
+      const turno = await this.findById(id);
       return turno;
     } catch (error) {
-      if (error.code === 'P2025') {
-        throw new Error(`Turno con ID ${id} no encontrado`);
-      }
-      throw new Error(`Error al cancelar turno: ${error.message}`);
+      console.error('Error en cancelarTurno:', error);
+      throw error;
     }
   }
 
   async confirmarTurno(id) {
     try {
-      const turno = await this.prisma.turno.update({
-        where: { id: parseInt(id) },
-        data: { estado: 'CONFIRMADO' },
-        include: {
-          historialCambios: {
-            orderBy: { fechaCambio: 'desc' }
-          }
-        }
-      });
-      return turno;
+      const [result] = await this.pool.execute(
+        'UPDATE turnos SET estado = \'CONFIRMADO\', updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [id]
+      );
+      if (result.affectedRows === 0) return null;
+      return await this.findById(id);
     } catch (error) {
-      if (error.code === 'P2025') {
-        throw new Error(`Turno con ID ${id} no encontrado`);
-      }
-      throw new Error(`Error al confirmar turno: ${error.message}`);
+      console.error('Error en confirmarTurno:', error);
+      throw error;
     }
   }
 
   async completarTurno(id) {
     try {
-      const turno = await this.prisma.turno.update({
-        where: { id: parseInt(id) },
-        data: { estado: 'COMPLETADO' },
-        include: {
-          historialCambios: {
-            orderBy: { fechaCambio: 'desc' }
-          }
-        }
-      });
-      return turno;
+      const [result] = await this.pool.execute(
+        'UPDATE turnos SET estado = \'COMPLETADO\', updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [id]
+      );
+      if (result.affectedRows === 0) return null;
+      return await this.findById(id);
     } catch (error) {
-      if (error.code === 'P2025') {
-        throw new Error(`Turno con ID ${id} no encontrado`);
-      }
-      throw new Error(`Error al completar turno: ${error.message}`);
+      console.error('Error en completarTurno:', error);
+      throw error;
     }
   }
 
   async marcarNoShow(id) {
     try {
-      const turno = await this.prisma.turno.update({
-        where: { id: parseInt(id) },
-        data: { estado: 'NO_SHOW' },
-        include: {
-          historialCambios: {
-            orderBy: { fechaCambio: 'desc' }
-          }
-        }
-      });
-      return turno;
+      const [result] = await this.pool.execute(
+        'UPDATE turnos SET estado = \'NO_SHOW\', updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [id]
+      );
+      if (result.affectedRows === 0) return null;
+      return await this.findById(id);
     } catch (error) {
-      if (error.code === 'P2025') {
-        throw new Error(`Turno con ID ${id} no encontrado`);
+      console.error('Error en marcarNoShow:', error);
+      throw error;
+    }
+  }
+
+  async updateEstado(id, estado) {
+    try {
+      const [result] = await this.pool.execute(
+        'UPDATE turnos SET estado = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [estado, id]
+      );
+      
+      if (result.affectedRows === 0) {
+        return null;
       }
-      throw new Error(`Error al marcar turno como no show: ${error.message}`);
+      
+      return { id, estado };
+    } catch (error) {
+      console.error('Error en updateEstado:', error);
+      throw error;
+    }
+  }
+
+  async delete(id) {
+    try {
+      const [result] = await this.pool.execute(
+        'DELETE FROM turnos WHERE id = ?',
+        [id]
+      );
+      
+      return result.affectedRows > 0;
+    } catch (error) {
+      console.error('Error en delete:', error);
+      throw error;
     }
   }
 
   async search(query) {
     try {
-      const turnos = await this.prisma.turno.findMany({
-        where: {
-          OR: [
-            { motivo: { contains: query, mode: 'insensitive' } },
-            { observaciones: { contains: query, mode: 'insensitive' } }
-          ]
-        },
-        orderBy: [
-          { fecha: 'asc' },
-          { hora: 'asc' }
-        ],
-        include: {
-          historialCambios: {
-            orderBy: { fechaCambio: 'desc' }
-          }
-        }
-      });
-      return turnos;
+      const searchTerm = `%${query}%`;
+      const [rows] = await this.pool.execute(
+        `SELECT t.*, p.nombre as paciente_nombre, p.apellido as paciente_apellido, 
+                m.nombre as medico_nombre, m.apellido as medico_apellido
+         FROM turnos t
+         LEFT JOIN pacientes p ON t.paciente_id = p.id
+         LEFT JOIN medicos m ON t.medico_id = m.id
+         WHERE t.motivo LIKE ? OR t.observaciones LIKE ? 
+         ORDER BY t.fecha DESC, t.hora DESC`,
+        [searchTerm, searchTerm]
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error al buscar turnos: ${error.message}`);
+      console.error('Error en search:', error);
+      throw error;
     }
   }
 
-  async disconnect() {
-    await this.prisma.$disconnect();
+  async getEstadisticas() {
+    try {
+      const [rows] = await this.pool.execute(
+        `SELECT 
+           estado,
+           COUNT(*) as cantidad,
+           DATE(fecha) as fecha
+         FROM turnos 
+         WHERE fecha >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+         GROUP BY estado, DATE(fecha)
+         ORDER BY fecha DESC`
+      );
+      return rows;
+    } catch (error) {
+      console.error('Error en getEstadisticas:', error);
+      throw error;
+    }
+  }
+
+  async getConnection() {
+    return await this.pool.getConnection();
+  }
+
+  async closeConnection() {
+    if (this.pool) {
+      await this.pool.end();
+    }
   }
 }
 

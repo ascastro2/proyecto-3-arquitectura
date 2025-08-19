@@ -7,7 +7,7 @@ services:
     routes:
       - name: pacientes-route
         paths:
-          - /api/pacientes
+          - /pacientes
         strip_path: false
         methods:
           - GET
@@ -21,7 +21,7 @@ services:
     routes:
       - name: medicos-route
         paths:
-          - /api/medicos
+          - /medicos
         strip_path: false
         methods:
           - GET
@@ -35,7 +35,7 @@ services:
     routes:
       - name: agendamiento-route
         paths:
-          - /api/agendamiento
+          - /agendamiento
         strip_path: true
         methods:
           - GET
@@ -50,8 +50,8 @@ services:
     routes:
       - name: notificaciones-route
         paths:
-          - /api/notificaciones
-        strip_path: true
+          - /notificaciones
+        strip_path: false
         methods:
           - GET
           - POST
@@ -59,6 +59,16 @@ services:
           - DELETE
           - PATCH
           - OPTIONS
+
+  - name: gateway-health
+    url: http://pacientes-service:3001
+    routes:
+      - name: gateway-health-route
+        paths:
+          - /health
+        strip_path: false
+        methods:
+          - GET
 
 plugins:
   - name: cors
