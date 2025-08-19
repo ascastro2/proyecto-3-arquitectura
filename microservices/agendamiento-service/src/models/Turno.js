@@ -3,16 +3,16 @@ const Joi = require('joi');
 class Turno {
   constructor(data) {
     this.id = data.id;
-    this.pacienteId = data.pacienteId;
-    this.medicoId = data.medicoId;
+    this.pacienteId = data.paciente_id || data.pacienteId;
+    this.medicoId = data.medico_id || data.medicoId;
     this.fecha = data.fecha;
     this.hora = data.hora;
-    this.diaSemana = data.diaSemana;
+    this.diaSemana = data.dia_semana || data.diaSemana;
     this.estado = data.estado;
     this.motivo = data.motivo;
     this.observaciones = data.observaciones;
-    this.createdAt = data.createdAt;
-    this.updatedAt = data.updatedAt;
+    this.createdAt = data.created_at || data.createdAt;
+    this.updatedAt = data.updated_at || data.updatedAt;
   }
 
   static getValidationSchema() {

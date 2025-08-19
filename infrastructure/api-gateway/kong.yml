@@ -80,6 +80,7 @@ plugins:
         - POST
         - PUT
         - DELETE
+        - PATCH
         - OPTIONS
       headers:
         - Accept
