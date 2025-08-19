@@ -1,18 +1,12 @@
 #!/bin/sh
 set -e
 
-# Generar cliente de Prisma
-npx prisma generate
+echo "🚀 Iniciando Pacientes Service..."
 
-# Aplicar migraciones (idempotente en despliegue)
-npx prisma migrate deploy
-
-# Ejecutar seed (opcional; si no está configurado, no falla)
-if npx prisma db seed; then
-  echo "Seed ejecutado correctamente"
-else
-  echo "Seed no ejecutado o no configurado; continuando..."
-fi
+# Esperar a que la base de datos esté lista
+echo "⏳ Esperando a que la base de datos esté lista..."
+sleep 15
 
 # Iniciar servicio
+echo "🚀 Iniciando servidor Node.js..."
 node src/server.js

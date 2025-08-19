@@ -9,7 +9,7 @@ class EmailService {
   initializeTransporter() {
     // Configuración del transportador de email
     // En producción, usar variables de entorno para credenciales
-    this.transporter = nodemailer.createTransporter({
+    this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: process.env.SMTP_PORT || 587,
       secure: false, // true para 465, false para otros puertos

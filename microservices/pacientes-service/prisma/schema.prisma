@@ -3,6 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  binaryTargets = ["native"]
 }
 
 datasource db {
@@ -17,10 +18,10 @@ model Paciente {
   apellido  String
   email     String   @unique
   telefono  String
-  fechaNacimiento DateTime
+  fecha_nacimiento DateTime @map("fecha_nacimiento")
   direccion String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @default(now()) @map("updated_at")
 
   @@map("pacientes")
 }

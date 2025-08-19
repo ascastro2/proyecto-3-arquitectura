@@ -1,153 +1,175 @@
-const { PrismaClient } = require('@prisma/client');
+const mysql = require('mysql2/promise');
 
 class PacienteRepository {
   constructor() {
-    this.prisma = new PrismaClient();
+    this.pool = null;
+    this.initializeConnection();
+  }
+
+  async initializeConnection() {
+    try {
+      this.pool = mysql.createPool({
+        host: process.env.DB_HOST || 'pacientes-db',
+        user: process.env.DB_USER || 'pacientes_user',
+        password: process.env.DB_PASSWORD || 'pacientes_pass',
+        database: process.env.DB_NAME || 'pacientes_db',
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
+        port: process.env.DB_PORT || 3306
+      });
+
+      // Verificar conexión
+      await this.pool.getConnection();
+      console.log('✅ Conexión a MySQL establecida correctamente');
+    } catch (error) {
+      console.error('❌ Error conectando a MySQL:', error);
+      throw error;
+    }
   }
 
   async findAll() {
     try {
-      const pacientes = await this.prisma.paciente.findMany({
-        orderBy: {
-          apellido: 'asc'
-        }
-      });
-      return pacientes;
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM pacientes ORDER BY created_at DESC'
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error al obtener pacientes: ${error.message}`);
+      console.error('Error en findAll:', error);
+      throw error;
     }
   }
 
   async findById(id) {
     try {
-      const paciente = await this.prisma.paciente.findUnique({
-        where: { id: parseInt(id) }
-      });
-      return paciente;
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM pacientes WHERE id = ?',
+        [id]
+      );
+      return rows[0] || null;
     } catch (error) {
-      throw new Error(`Error al obtener paciente con ID ${id}: ${error.message}`);
+      console.error('Error en findById:', error);
+      throw error;
     }
   }
 
-  async findByDNI(dni) {
+  async findByDni(dni) {
     try {
-      const paciente = await this.prisma.paciente.findUnique({
-        where: { dni }
-      });
-      return paciente;
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM pacientes WHERE dni = ?',
+        [dni]
+      );
+      return rows[0] || null;
     } catch (error) {
-      throw new Error(`Error al obtener paciente con DNI ${dni}: ${error.message}`);
+      console.error('Error en findByDni:', error);
+      throw error;
     }
   }
 
   async findByEmail(email) {
     try {
-      const paciente = await this.prisma.paciente.findUnique({
-        where: { email }
-      });
-      return paciente;
+      const [rows] = await this.pool.execute(
+        'SELECT * FROM pacientes WHERE email = ?',
+        [email]
+      );
+      return rows[0] || null;
     } catch (error) {
-      throw new Error(`Error al obtener paciente con email ${email}: ${error.message}`);
+      console.error('Error en findByEmail:', error);
+      throw error;
     }
   }
 
   async create(pacienteData) {
     try {
-      const paciente = await this.prisma.paciente.create({
-        data: {
-          dni: pacienteData.dni,
-          nombre: pacienteData.nombre,
-          apellido: pacienteData.apellido,
-          email: pacienteData.email,
-          telefono: pacienteData.telefono,
-          fechaNacimiento: new Date(pacienteData.fechaNacimiento),
-          direccion: pacienteData.direccion
-        }
-      });
-      return paciente;
+      const [result] = await this.pool.execute(
+        `INSERT INTO pacientes (dni, nombre, apellido, email, telefono, fecha_nacimiento, direccion) 
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          pacienteData.dni,
+          pacienteData.nombre,
+          pacienteData.apellido,
+          pacienteData.email,
+          pacienteData.telefono,
+          pacienteData.fechaNacimiento,
+          pacienteData.direccion || null
+        ]
+      );
+      
+      return { id: result.insertId, ...pacienteData };
     } catch (error) {
-      if (error.code === 'P2002') {
-        if (error.meta?.target?.includes('dni')) {
-          throw new Error('Ya existe un paciente con ese DNI');
-        }
-        if (error.meta?.target?.includes('email')) {
-          throw new Error('Ya existe un paciente con ese email');
-        }
-      }
-      throw new Error(`Error al crear paciente: ${error.message}`);
+      console.error('Error en create:', error);
+      throw error;
     }
   }
 
   async update(id, pacienteData) {
     try {
-      const updateData = {};
+      const [result] = await this.pool.execute(
+        `UPDATE pacientes 
+         SET dni = ?, nombre = ?, apellido = ?, email = ?, telefono = ?, 
+             fecha_nacimiento = ?, direccion = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [
+          pacienteData.dni,
+          pacienteData.nombre,
+          pacienteData.apellido,
+          pacienteData.email,
+          pacienteData.telefono,
+          pacienteData.fechaNacimiento,
+          pacienteData.direccion || null,
+          id
+        ]
+      );
       
-      if (pacienteData.dni) updateData.dni = pacienteData.dni;
-      if (pacienteData.nombre) updateData.nombre = pacienteData.nombre;
-      if (pacienteData.apellido) updateData.apellido = pacienteData.apellido;
-      if (pacienteData.email) updateData.email = pacienteData.email;
-      if (pacienteData.telefono) updateData.telefono = pacienteData.telefono;
-      if (pacienteData.fechaNacimiento) updateData.fechaNacimiento = new Date(pacienteData.fechaNacimiento);
-      if (pacienteData.direccion !== undefined) updateData.direccion = pacienteData.direccion;
-
-      const paciente = await this.prisma.paciente.update({
-        where: { id: parseInt(id) },
-        data: updateData
-      });
-      return paciente;
+      if (result.affectedRows === 0) {
+        return null;
+      }
+      
+      return { id, ...pacienteData };
     } catch (error) {
-      if (error.code === 'P2025') {
-        throw new Error(`Paciente con ID ${id} no encontrado`);
-      }
-      if (error.code === 'P2002') {
-        if (error.meta?.target?.includes('dni')) {
-          throw new Error('Ya existe un paciente con ese DNI');
-        }
-        if (error.meta?.target?.includes('email')) {
-          throw new Error('Ya existe un paciente con ese email');
-        }
-      }
-      throw new Error(`Error al actualizar paciente: ${error.message}`);
+      console.error('Error en update:', error);
+      throw error;
     }
   }
 
   async delete(id) {
     try {
-      const paciente = await this.prisma.paciente.delete({
-        where: { id: parseInt(id) }
-      });
-      return paciente;
+      const [result] = await this.pool.execute(
+        'DELETE FROM pacientes WHERE id = ?',
+        [id]
+      );
+      
+      return result.affectedRows > 0;
     } catch (error) {
-      if (error.code === 'P2025') {
-        throw new Error(`Paciente con ID ${id} no encontrado`);
-      }
-      throw new Error(`Error al eliminar paciente: ${error.message}`);
+      console.error('Error en delete:', error);
+      throw error;
     }
   }
 
   async search(query) {
     try {
-      const pacientes = await this.prisma.paciente.findMany({
-        where: {
-          OR: [
-            { nombre: { contains: query, mode: 'insensitive' } },
-            { apellido: { contains: query, mode: 'insensitive' } },
-            { dni: { contains: query } },
-            { email: { contains: query, mode: 'insensitive' } }
-          ]
-        },
-        orderBy: {
-          apellido: 'asc'
-        }
-      });
-      return pacientes;
+      const searchTerm = `%${query}%`;
+      const [rows] = await this.pool.execute(
+        `SELECT * FROM pacientes 
+         WHERE nombre LIKE ? OR apellido LIKE ? OR dni LIKE ? OR email LIKE ?
+         ORDER BY nombre, apellido`,
+        [searchTerm, searchTerm, searchTerm, searchTerm]
+      );
+      return rows;
     } catch (error) {
-      throw new Error(`Error al buscar pacientes: ${error.message}`);
+      console.error('Error en search:', error);
+      throw error;
     }
   }
 
-  async disconnect() {
-    await this.prisma.$disconnect();
+  async getConnection() {
+    return await this.pool.getConnection();
+  }
+
+  async closeConnection() {
+    if (this.pool) {
+      await this.pool.end();
+    }
   }
 }
 
