@@ -23,7 +23,67 @@ class AgendamientoService {
     }
   }
 
+  async obtenerTurnos(filters = {}) {
+    try {
+      const { page = 1, limit = 10, estado, fecha, medicoId, pacienteId } = filters;
+      
+      let turnos = await this.turnoRepository.findAll();
+      
+      // Aplicar filtros
+      if (estado) {
+        turnos = turnos.filter(turno => turno.estado === estado);
+      }
+      if (fecha) {
+        const fechaFiltro = new Date(fecha);
+        turnos = turnos.filter(turno => {
+          const turnoFecha = new Date(turno.fecha);
+          return turnoFecha.toDateString() === fechaFiltro.toDateString();
+        });
+      }
+      if (medicoId) {
+        turnos = turnos.filter(turno => turno.medico_id === medicoId);
+      }
+      if (pacienteId) {
+        turnos = turnos.filter(turno => turno.paciente_id === pacienteId);
+      }
+      
+      // Aplicar paginación
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedTurnos = turnos.slice(startIndex, endIndex);
+      
+      return {
+        turnos: paginatedTurnos.map(turno => new Turno(turno).toJSON()),
+        pagination: {
+          page,
+          limit,
+          total: turnos.length,
+          totalPages: Math.ceil(turnos.length / limit)
+        }
+      };
+    } catch (error) {
+      throw new Error(`Error en servicio al obtener turnos: ${error.message}`);
+    }
+  }
+
   async getTurnoById(id) {
+    try {
+      if (!id || isNaN(id)) {
+        throw new Error('ID de turno inválido');
+      }
+
+      const turno = await this.turnoRepository.findById(id);
+      if (!turno) {
+        throw new Error(`Turno con ID ${id} no encontrado`);
+      }
+
+      return new Turno(turno).toJSON();
+    } catch (error) {
+      throw new Error(`Error en servicio al obtener turno: ${error.message}`);
+    }
+  }
+
+  async obtenerTurnoPorId(id) {
     try {
       if (!id || isNaN(id)) {
         throw new Error('ID de turno inválido');
@@ -477,6 +537,100 @@ class AgendamientoService {
   }
 
   async getEstadisticas(fechaInicio, fechaFin) {
+    try {
+      if (!fechaInicio || !fechaFin || isNaN(Date.parse(fechaInicio)) || isNaN(Date.parse(fechaFin))) {
+        throw new Error('Fechas inválidas');
+      }
+
+      if (new Date(fechaInicio) > new Date(fechaFin)) {
+        throw new Error('La fecha de inicio debe ser anterior a la fecha de fin');
+      }
+
+      const estadisticas = await this.historialCambioRepository.getEstadisticas(fechaInicio, fechaFin);
+      return estadisticas;
+    } catch (error) {
+      throw new Error(`Error en servicio al obtener estadísticas: ${error.message}`);
+    }
+  }
+
+  async buscarDisponibilidad(filters = {}) {
+    try {
+      const { medicoId, fecha, horaInicio, horaFin } = filters;
+      
+      if (!medicoId || !fecha) {
+        throw new Error('Se requiere médico y fecha para buscar disponibilidad');
+      }
+
+      // Obtener turnos existentes para el médico en esa fecha
+      const turnosExistentes = await this.turnoRepository.findByMedicoAndFecha(medicoId, fecha);
+      
+      // Horarios disponibles (8:00 a 18:00)
+      const horariosDisponibles = [];
+      const horaInicioDia = horaInicio ? parseInt(horaInicio.split(':')[0]) : 8;
+      const horaFinDia = horaFin ? parseInt(horaFin.split(':')[0]) : 18;
+      
+      for (let hora = horaInicioDia; hora < horaFinDia; hora++) {
+        const horaStr = `${hora.toString().padStart(2, '0')}:00`;
+        const turnoOcupado = turnosExistentes.find(turno => turno.hora === horaStr);
+        
+        if (!turnoOcupado) {
+          horariosDisponibles.push(horaStr);
+        }
+      }
+      
+      return {
+        medicoId,
+        fecha,
+        horariosDisponibles,
+        totalDisponibles: horariosDisponibles.length
+      };
+    } catch (error) {
+      throw new Error(`Error en servicio al buscar disponibilidad: ${error.message}`);
+    }
+  }
+
+  async obtenerHistorialCambios(filters = {}) {
+    try {
+      const { turnoId, tipo, fechaInicio, fechaFin, page = 1, limit = 10 } = filters;
+      
+      let historial = await this.historialCambioRepository.findAll();
+      
+      // Aplicar filtros
+      if (turnoId) {
+        historial = historial.filter(h => h.turno_id === turnoId);
+      }
+      if (tipo) {
+        historial = historial.filter(h => h.tipo_cambio === tipo);
+      }
+      if (fechaInicio && fechaFin) {
+        const inicio = new Date(fechaInicio);
+        const fin = new Date(fechaFin);
+        historial = historial.filter(h => {
+          const fechaCambio = new Date(h.fecha_cambio);
+          return fechaCambio >= inicio && fechaCambio <= fin;
+        });
+      }
+      
+      // Aplicar paginación
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedHistorial = historial.slice(startIndex, endIndex);
+      
+      return {
+        historial: paginatedHistorial.map(h => new HistorialCambio(h).toJSON()),
+        pagination: {
+          page,
+          limit,
+          total: historial.length,
+          totalPages: Math.ceil(historial.length / limit)
+        }
+      };
+    } catch (error) {
+      throw new Error(`Error en servicio al obtener historial de cambios: ${error.message}`);
+    }
+  }
+
+  async obtenerEstadisticas(fechaInicio, fechaFin) {
     try {
       if (!fechaInicio || !fechaFin || isNaN(Date.parse(fechaInicio)) || isNaN(Date.parse(fechaFin))) {
         throw new Error('Fechas inválidas');

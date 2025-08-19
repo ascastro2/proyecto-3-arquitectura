@@ -38,7 +38,7 @@ class PacienteService {
         throw new Error('DNI inválido');
       }
 
-      const paciente = await this.pacienteRepository.findByDNI(dni);
+      const paciente = await this.pacienteRepository.findByDni(dni);
       if (!paciente) {
         throw new Error(`Paciente con DNI ${dni} no encontrado`);
       }
@@ -78,7 +78,7 @@ class PacienteService {
       }
 
       // Verificar si ya existe un paciente con el mismo DNI
-      const existingPacienteByDNI = await this.pacienteRepository.findByDNI(pacienteData.dni);
+      const existingPacienteByDNI = await this.pacienteRepository.findByDni(pacienteData.dni);
       if (existingPacienteByDNI) {
         throw new Error('Ya existe un paciente con ese DNI');
       }
@@ -118,7 +118,7 @@ class PacienteService {
 
       // Verificar unicidad de DNI si se está actualizando
       if (pacienteData.dni && pacienteData.dni !== existingPaciente.dni) {
-        const existingPacienteByDNI = await this.pacienteRepository.findByDNI(pacienteData.dni);
+        const existingPacienteByDNI = await this.pacienteRepository.findByDni(pacienteData.dni);
         if (existingPacienteByDNI) {
           throw new Error('Ya existe un paciente con ese DNI');
         }

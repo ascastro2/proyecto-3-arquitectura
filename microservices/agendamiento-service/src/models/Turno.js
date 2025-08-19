@@ -70,7 +70,18 @@ class Turno {
 
   validate() {
     const schema = Turno.getValidationSchema();
-    const { error } = schema.validate(this);
+    // Solo validar los campos que se envían, no todo el objeto this
+    const dataToValidate = {
+      pacienteId: this.pacienteId,
+      medicoId: this.medicoId,
+      fecha: this.fecha,
+      hora: this.hora,
+      diaSemana: this.diaSemana,
+      estado: this.estado,
+      motivo: this.motivo,
+      observaciones: this.observaciones
+    };
+    const { error } = schema.validate(dataToValidate);
     return { isValid: !error, error };
   }
 

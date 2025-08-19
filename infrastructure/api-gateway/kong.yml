@@ -36,7 +36,7 @@ services:
       - name: agendamiento-route
         paths:
           - /agendamiento
-        strip_path: true
+        strip_path: false
         methods:
           - GET
           - POST

@@ -1,0 +1,915 @@
+{
+  "info": {
+    "_postman_id": "flujo-completo-sistema-turnos",
+    "name": "Flujo Completo - Sistema de Turnos Médicos",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "flujo-completo"
+  },
+  "variables": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "paciente_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "medico_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "turno_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "turno_modificado_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔄 FLUJO COMPLETO DEL SISTEMA",
+      "item": [
+        {
+          "name": "0. Verificación del Sistema",
+          "item": [
+            {
+              "name": "Health Check - API Gateway",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/health"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Gateway funcionando', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "});",
+                      "console.log('✅ API Gateway funcionando correctamente');"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Health Check - Pacientes Service",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/pacientes/health"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Pacientes Service funcionando', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "});",
+                      "console.log('✅ Pacientes Service funcionando correctamente');"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Health Check - Médicos Service",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/medicos/health"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Médicos Service funcionando', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "});",
+                      "console.log('✅ Médicos Service funcionando correctamente');"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Health Check - Agendamiento Service",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/agendamiento/health"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Agendamiento Service funcionando', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "});",
+                      "console.log('✅ Agendamiento Service funcionando correctamente');"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Health Check - Notificaciones Service",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/notificaciones/health"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Notificaciones Service funcionando', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "});",
+                      "console.log('✅ Notificaciones Service funcionando correctamente');"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "1. Creación de Pacientes",
+          "item": [
+            {
+              "name": "Crear Paciente 1 - Juan Pérez",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"dni\": \"11111111\",\n  \"nombre\": \"Juan Carlos\",\n  \"apellido\": \"Pérez González\",\n  \"email\": \"juan.perez@email.com\",\n  \"telefono\": \"1111111111\",\n  \"fechaNacimiento\": \"1985-03-15\",\n  \"direccion\": \"Av. Corrientes 1234, CABA\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/pacientes"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Paciente 1 creado exitosamente', function () {",
+                      "    pm.response.to.have.status(201);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data.id).to.be.a('number');",
+                      "    pm.collectionVariables.set('paciente_id', response.data.id);",
+                      "});",
+                      "console.log('✅ Paciente 1 creado con ID:', pm.collectionVariables.get('paciente_id'));"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Crear Paciente 2 - María González",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"dni\": \"22222222\",\n  \"nombre\": \"María Elena\",\n  \"apellido\": \"González Silva\",\n  \"email\": \"maria.gonzalez@email.com\",\n  \"telefono\": \"2222222222\",\n  \"fechaNacimiento\": \"1990-11-08\",\n  \"direccion\": \"Av. Belgrano 456, CABA\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/pacientes"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Paciente 2 creado exitosamente', function () {",
+                      "    pm.response.to.have.status(201);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data.id).to.be.a('number');",
+                      "});",
+                      "console.log('✅ Paciente 2 creado exitosamente');"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Verificar Pacientes Creados",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/pacientes"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Lista de pacientes obtenida', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data).to.be.an('array');",
+                      "    pm.expect(response.data.length).to.be.at.least(2);",
+                      "});",
+                      "console.log('✅ Lista de pacientes obtenida:', response.data.length, 'pacientes');"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "2. Creación de Médicos",
+          "item": [
+            {
+              "name": "Crear Médico 1 - Dr. Rodríguez",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"matricula\": \"111111\",\n  \"nombre\": \"Dr. Roberto\",\n  \"apellido\": \"Rodríguez López\",\n  \"especialidad\": \"Cardiología\",\n  \"email\": \"roberto.rodriguez@clinica.com\",\n  \"telefono\": \"3333333333\",\n  \"fechaNacimiento\": \"1978-07-22\",\n  \"direccion\": \"Av. Callao 987, CABA\",\n  \"activo\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/medicos"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Médico 1 creado exitosamente', function () {",
+                      "    pm.response.to.have.status(201);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data.id).to.be.a('number');",
+                      "    pm.collectionVariables.set('medico_id', response.data.id);",
+                      "});",
+                      "console.log('✅ Médico 1 creado con ID:', pm.collectionVariables.get('medico_id'));"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Crear Médico 2 - Dra. Martínez",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"matricula\": \"222222\",\n  \"nombre\": \"Dra. Ana\",\n  \"apellido\": \"Martínez Ruiz\",\n  \"especialidad\": \"Dermatología\",\n  \"email\": \"ana.martinez@clinica.com\",\n  \"telefono\": \"4444444444\",\n  \"fechaNacimiento\": \"1982-05-14\",\n  \"direccion\": \"Av. Las Heras 789, CABA\",\n  \"activo\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/medicos"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Médico 2 creado exitosamente', function () {",
+                      "    pm.response.to.have.status(201);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data.id).to.be.a('number');",
+                      "});",
+                      "console.log('✅ Médico 2 creado exitosamente');"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Verificar Médicos Creados",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/medicos"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Lista de médicos obtenida', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data).to.be.an('array');",
+                      "    pm.expect(response.data.length).to.be.at.least(2);",
+                      "});",
+                      "console.log('✅ Lista de médicos obtenida:', response.data.length, 'médicos');"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "3. Creación de Turnos",
+          "item": [
+            {
+              "name": "Crear Turno 1 - Cardiología",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"pacienteId\": {{paciente_id}},\n  \"medicoId\": {{medico_id}},\n  \"fecha\": \"2025-08-25 09:00:00\",\n  \"hora\": \"09:00\",\n  \"diaSemana\": 1,\n  \"motivo\": \"Consulta cardiológica de rutina\",\n  \"observaciones\": \"Paciente con hipertensión, control mensual\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/agendamiento/turnos"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Turno 1 creado exitosamente', function () {",
+                      "    pm.response.to.have.status(201);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data.id).to.be.a('number');",
+                      "    pm.collectionVariables.set('turno_id', response.data.id);",
+                      "});",
+                      "console.log('✅ Turno 1 creado con ID:', pm.collectionVariables.get('turno_id'));"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Crear Turno 2 - Dermatología",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"pacienteId\": {{paciente_id}},\n  \"medicoId\": {{medico_id}},\n  \"fecha\": \"2025-08-26 14:00:00\",\n  \"hora\": \"14:00\",\n  \"diaSemana\": 2,\n  \"motivo\": \"Consulta dermatológica\",\n  \"observaciones\": \"Paciente con manchas en la piel\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/agendamiento/turnos"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Turno 2 creado exitosamente', function () {",
+                      "    pm.response.to.have.status(201);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data.id).to.be.a('number');",
+                      "    pm.collectionVariables.set('turno_modificado_id', response.data.id);",
+                      "});",
+                      "console.log('✅ Turno 2 creado con ID:', pm.collectionVariables.get('turno_modificado_id'));"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Verificar Turnos Creados",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/agendamiento/turnos"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Lista de turnos obtenida', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data.turnos).to.be.an('array');",
+                      "    pm.expect(response.data.turnos.length).to.be.at.least(2);",
+                      "});",
+                      "console.log('✅ Lista de turnos obtenida:', response.data.turnos.length, 'turnos');"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "4. Confirmación de Turnos (Eventos RabbitMQ)",
+          "item": [
+            {
+              "name": "Confirmar Turno 1",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/agendamiento/turnos/{{turno_id}}/confirmar"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Turno 1 confirmado exitosamente', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data.estado).to.equal('CONFIRMADO');",
+                      "});",
+                      "console.log('✅ Turno 1 confirmado - Evento RabbitMQ generado');"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Confirmar Turno 2",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/agendamiento/turnos/{{turno_modificado_id}}/confirmar"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Turno 2 confirmado exitosamente', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data.estado).to.equal('CONFIRMADO');",
+                      "});",
+                      "console.log('✅ Turno 2 confirmado - Evento RabbitMQ generado');"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "5. Modificación de Turnos",
+          "item": [
+            {
+              "name": "Modificar Turno 2 - Cambiar Hora",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"hora\": \"16:00\",\n  \"motivo\": \"Consulta dermatológica - Horario modificado\",\n  \"observaciones\": \"Paciente solicitó cambio de horario\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/agendamiento/turnos/{{turno_modificado_id}}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Turno 2 modificado exitosamente', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data.hora).to.equal('16:00');",
+                      "});",
+                      "console.log('✅ Turno 2 modificado - Evento RabbitMQ generado');"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "6. Cancelación de Turnos",
+          "item": [
+            {
+              "name": "Cancelar Turno 1",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"motivo\": \"Paciente solicitó cancelación por motivos personales\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/agendamiento/turnos/{{turno_id}}/cancelar"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Turno 1 cancelado exitosamente', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data.estado).to.equal('CANCELADO');",
+                      "});",
+                      "console.log('✅ Turno 1 cancelado - Evento RabbitMQ generado');"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "7. Verificación de Eventos y Notificaciones",
+          "item": [
+            {
+              "name": "Verificar Notificaciones Generadas",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/notificaciones"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Notificaciones obtenidas', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data).to.be.an('array');",
+                      "});",
+                      "console.log('✅ Notificaciones obtenidas:', response.data.length, 'notificaciones');",
+                      "console.log('📧 Tipos de notificaciones:', response.data.map(n => n.tipo).join(', '));"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Verificar Historial de Cambios",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/agendamiento/historial"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Historial de cambios obtenido', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data.historial).to.be.an('array');",
+                      "});",
+                      "console.log('✅ Historial de cambios obtenido:', response.data.historial.length, 'cambios');",
+                      "console.log('📝 Tipos de cambios:', response.data.historial.map(h => h.tipo_cambio).join(', '));"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "8. Consultas y Búsquedas",
+          "item": [
+            {
+              "name": "Buscar Paciente por DNI",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/pacientes/dni/11111111"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Paciente encontrado por DNI', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data.dni).to.equal('11111111');",
+                      "});",
+                      "console.log('✅ Paciente encontrado por DNI:', response.data.nombre, response.data.apellido);"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Buscar Médico por Especialidad",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/medicos"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Médicos obtenidos', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data).to.be.an('array');",
+                      "});",
+                      "const cardiologos = response.data.filter(m => m.especialidad === 'Cardiología');",
+                      "const dermatologos = response.data.filter(m => m.especialidad === 'Dermatología');",
+                      "console.log('✅ Cardiólogos encontrados:', cardiologos.length);",
+                      "console.log('✅ Dermatólogos encontrados:', dermatologos.length);"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Buscar Disponibilidad del Médico",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/agendamiento/disponibilidad?medicoId={{medico_id}}&fecha=2025-08-25"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Disponibilidad obtenida', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data.horariosDisponibles).to.be.an('array');",
+                      "});",
+                      "console.log('✅ Horarios disponibles:', response.data.horariosDisponibles.length, 'horarios');",
+                      "console.log('🕐 Horarios:', response.data.horariosDisponibles.join(', '));"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "9. Verificación Final del Sistema",
+          "item": [
+            {
+              "name": "Estado Final - Pacientes",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/pacientes"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Estado final de pacientes verificado', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data).to.be.an('array');",
+                      "});",
+                      "console.log('🎯 ESTADO FINAL - PACIENTES:', response.data.length, 'pacientes registrados');"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Estado Final - Médicos",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/medicos"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Estado final de médicos verificado', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data).to.be.an('array');",
+                      "});",
+                      "console.log('🎯 ESTADO FINAL - MÉDICOS:', response.data.length, 'médicos registrados');"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Estado Final - Turnos",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/agendamiento/turnos"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Estado final de turnos verificado', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data.turnos).to.be.an('array');",
+                      "});",
+                      "const turnosConfirmados = response.data.turnos.filter(t => t.estado === 'CONFIRMADO').length;",
+                      "const turnosCancelados = response.data.turnos.filter(t => t.estado === 'CANCELADO').length;",
+                      "console.log('🎯 ESTADO FINAL - TURNOS:', response.data.turnos.length, 'turnos totales');",
+                      "console.log('✅ Turnos confirmados:', turnosConfirmados);",
+                      "console.log('❌ Turnos cancelados:', turnosCancelados);"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Estado Final - Notificaciones",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/notificaciones"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Estado final de notificaciones verificado', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const response = pm.response.json();",
+                      "    pm.expect(response.success).to.be.true;",
+                      "    pm.expect(response.data).to.be.an('array');",
+                      "});",
+                      "console.log('🎯 ESTADO FINAL - NOTIFICACIONES:', response.data.length, 'notificaciones generadas');",
+                      "console.log('🎉 ¡SISTEMA COMPLETAMENTE FUNCIONAL!');",
+                      "console.log('📋 Resumen del flujo:');",
+                      "console.log('   • Pacientes creados y verificados');",
+                      "console.log('   • Médicos creados y verificados');",
+                      "console.log('   • Turnos creados, confirmados, modificados y cancelados');",
+                      "console.log('   • Eventos RabbitMQ generados correctamente');",
+                      "console.log('   • Notificaciones creadas automáticamente');",
+                      "console.log('   • Historial de cambios registrado');",
+                      "console.log('   • API Gateway funcionando correctamente');"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

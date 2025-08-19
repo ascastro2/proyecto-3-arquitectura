@@ -72,7 +72,19 @@ class Medico {
 
   validate() {
     const schema = Medico.getValidationSchema();
-    const { error } = schema.validate(this);
+    // Solo validar los campos que se envían, no todo el objeto this
+    const dataToValidate = {
+      matricula: this.matricula,
+      nombre: this.nombre,
+      apellido: this.apellido,
+      especialidad: this.especialidad,
+      email: this.email,
+      telefono: this.telefono,
+      fechaNacimiento: this.fechaNacimiento,
+      direccion: this.direccion,
+      activo: this.activo
+    };
+    const { error } = schema.validate(dataToValidate);
     return { isValid: !error, error };
   }
 

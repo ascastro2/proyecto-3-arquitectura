@@ -62,7 +62,17 @@ class Paciente {
 
   validate() {
     const schema = Paciente.getValidationSchema();
-    const { error } = schema.validate(this);
+    // Solo validar los campos que se envían, no todo el objeto this
+    const dataToValidate = {
+      dni: this.dni,
+      nombre: this.nombre,
+      apellido: this.apellido,
+      email: this.email,
+      telefono: this.telefono,
+      fechaNacimiento: this.fechaNacimiento,
+      direccion: this.direccion
+    };
+    const { error } = schema.validate(dataToValidate);
     return { isValid: !error, error };
   }
 
